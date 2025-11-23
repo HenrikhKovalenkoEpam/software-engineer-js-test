@@ -1,57 +1,82 @@
-import React from 'react';
-import {useState, useEffect, useRef} from 'react';
+import React, { useState, useRef, useEffect } from "react";
+import { CANVAS_HEIGHT_PX, CANVAS_WIDTH_PX } from "./constants";
+import { PhotoState } from "./interfaces";
+import { useExportImport } from "../../hooks/useExportImport";
+import { usePhoto } from "../../hooks/usePhoto";
 
-export const PhotoEditor = () => {
-	const [image, setImage] = useState<HTMLImageElement>();
-	const canvasRef = useRef<HTMLCanvasElement>(null);
+export const PhotoEditor: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-	useEffect(() => {
-		if (image && canvasRef.current) {
-			const canvas = canvasRef.current;
-			const ctx = canvas.getContext('2d');
-			const width = image.naturalWidth;
-			const height = image.naturalHeight;
-			canvas.width = 500;
-			canvas.height = 500 * height / width;
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [photoState, setPhotoState] = useState<PhotoState | null>(null);
+  const { handleImport, handleExport } = useExportImport();
+  const { handlePhotoUpload, movePhoto } = usePhoto();
 
-			ctx?.drawImage(image, 0, 0, width, height, 0, 0, canvas.width, canvas.height);
-		}
-	}, [image]);
+  useEffect(() => {
+    if (!canvasRef.current || !image || !photoState) return;
 
-	const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-		// get all selected Files
-		const files = e.target.files as FileList;
-		let file;
-		for ( let i = 0; i < files.length; ++i ) {
-			file = files[ i ];
-			// check if file is valid Image (just a MIME check)
-			switch ( file.type ) {
-				case "image/jpeg":
-				case "image/png":
-				case "image/gif":
-					// read Image contents from file
-					const reader = new FileReader();
-					reader.onload = (e: ProgressEvent<FileReader>) => {
-						// create HTMLImageElement holding image data
-						const img = new Image();
-						img.src = reader.result as string;
-						img.onload = () => setImage(img)
-					};
-					reader.readAsDataURL( file );
-					// process just one file
-					return;
-			}
-		}
-	};
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-	return (
-		<>
-			<div>
-				<h1>Photo Editor</h1>
-				<label htmlFor="fileSelector">Upload Images</label>
-				<input type="file" id="fileSelector" onChange={handlePhotoUpload} />
-			</div>
-			<canvas ref={canvasRef} />
-		</>
-	);
+    ctx.clearRect(0, 0, CANVAS_WIDTH_PX, CANVAS_HEIGHT_PX);
+    ctx.drawImage(
+      image,
+      0,
+      0,
+      image.naturalWidth,
+      image.naturalHeight,
+      photoState.x,
+      photoState.y,
+      photoState.width,
+      photoState.height,
+    );
+  }, [image, photoState]);
+
+  const handleMovePhoto = movePhoto({ photoState, setPhotoState });
+
+  return (
+    <div style={{ padding: 16 }}>
+      <h1>Photo Editor</h1>
+
+      <div style={{ marginBottom: 12 }}>
+        <label>
+          Upload photo:&nbsp;
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handlePhotoUpload({ setImage, setPhotoState })}
+          />
+        </label>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <label>
+          Import JSON:&nbsp;
+          <input
+            type="file"
+            accept="application/json"
+            onChange={handleImport({ setImage, setPhotoState })}
+          />
+        </label>
+      </div>
+
+      <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
+        <button onClick={() => handleMovePhoto(0, -10)}>Up</button>
+        <button onClick={() => handleMovePhoto(-10, 0)}>Left</button>
+        <button onClick={() => handleMovePhoto(10, 0)}>Right</button>
+        <button onClick={() => handleMovePhoto(0, 10)}>Down</button>
+        <button onClick={handleExport({ image, photoState })} disabled={!image}>
+          Export JSON
+        </button>
+      </div>
+
+      <canvas
+        ref={canvasRef}
+        width={CANVAS_WIDTH_PX}
+        height={CANVAS_HEIGHT_PX}
+        style={{ border: "1px solid #ccc" }}
+      />
+    </div>
+  );
 };
